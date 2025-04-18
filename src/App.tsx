@@ -1,14 +1,20 @@
 import React, { useState, useEffect } from "react";
-import { Word, WordType } from "./types";
+import { Word, WordType, LexiconLevel, SurfaceSubtype } from "./types";
+import { getWordsFromStorage, saveWordsToStorage } from "./storage";
+
 
 function App() {
-  const [words, setWords] = useState<Word[]>([]);
+  const [words, setWords] = useState<Word[]>(getWordsFromStorage());
   const [form, setForm] = useState<Omit<Word, "id">>({
     word: "",
     translation: "",
     type: "noun",
     semanticField: "",
     favorite: false,
+    lexicon: {
+      level: "surface",
+      subtype: "general",
+    },
   });
 
   const [filterType, setFilterType] = useState<string>("");
@@ -17,11 +23,9 @@ function App() {
 
   // Cargar palabras guardadas desde localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("words");
-    if (saved) {
-      setWords(JSON.parse(saved));
-    }
-  }, []);
+    saveWordsToStorage(words);
+  }, [words]);
+
 
   // Guardar palabras en localStorage cada vez que cambian
   useEffect(() => {
@@ -51,6 +55,10 @@ function App() {
       type: "noun",
       semanticField: "",
       favorite: false,
+      lexicon: {
+        level: "surface",
+        subtype: "general",
+      },
     });
   };
 
@@ -68,9 +76,89 @@ function App() {
     return true;
   });
 
+  // Funcion para exportar vocabulario
+  const exportWords = () => {
+    const dataStr = JSON.stringify(words, null, 2);
+    const blob = new Blob([dataStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "vocabulary.json";
+    link.click();
+
+    URL.revokeObjectURL(url);
+  };
+
+  // Funcion para importar vocabulario
+  const importWords = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const result = e.target?.result as string;
+        const imported = JSON.parse(result);
+        if (Array.isArray(imported)) {
+          setWords(imported); // carga en el estado
+        } else {
+          alert("El archivo no tiene el formato correcto.");
+        }
+      } catch (error) {
+        alert("Error al importar el archivo.");
+        console.error(error);
+      }
+    };
+
+    reader.readAsText(file);
+  };
+
+  // Funcion para Eliminar todas las palabras
+  const clearAllWords = () => {
+    const confirmDelete = window.confirm("¿Estás seguro de que quieres eliminar todas las palabras?");
+    if (confirmDelete) {
+      setWords([]);
+    }
+  };
+
+  // No se que hace
+  const handleLexiconChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const target = e.target as HTMLInputElement | HTMLSelectElement;
+    const { name, value, type } = target;
+    const checked = type === "checkbox" ? (target as HTMLInputElement).checked : undefined;
+
+    if (name === "lexicon.level") {
+      setForm({
+        ...form,
+        lexicon: {
+          level: value as LexiconLevel,
+          subtype: value === "surface" ? form.lexicon.subtype || "general" : undefined,
+        },
+      });
+    } else if (name === "lexicon.subtype") {
+      setForm({
+        ...form,
+        lexicon: {
+          ...form.lexicon,
+          subtype: value as SurfaceSubtype,
+        },
+      });
+    } else {
+      setForm({
+        ...form,
+        [name]: type === "checkbox" ? checked : value,
+      });
+    }
+  };
+
+
+
+
+
   return (
     <div style={{ padding: 20 }}>
-      <h1>VocaMuse</h1>
+      <h1>Vocax</h1>
 
       <h2>Agregar nueva palabra</h2>
       <input
@@ -100,6 +188,17 @@ function App() {
         value={form.semanticField}
         onChange={handleChange}
       />
+      <select name="lexicon.level" value={form.lexicon.level} onChange={handleLexiconChange}>
+        <option value="surface">Surface</option>
+        <option value="deep">Deep</option>
+      </select>
+
+      {form.lexicon.level === "surface" && (
+        <select name="lexicon.subtype" value={form.lexicon.subtype} onChange={handleLexiconChange}>
+          <option value="general">General</option>
+          <option value="verbalBrand">Verbal Brand</option>
+        </select>
+      )}
       <br />
       <label>
         <input
@@ -151,6 +250,22 @@ function App() {
           ))
         )}
       </ul>
+
+      <h2>Importar/Exportar Vocabulario</h2>
+      <div style={{ marginTop: "1rem" }}>
+        <button onClick={exportWords}>Exportar vocabulario</button>
+
+        <label style={{ marginLeft: "1rem", cursor: "pointer" }}>
+          Importar vocabulario
+          <input type="file" accept=".json" onChange={importWords} style={{ display: "none" }} />
+        </label>
+      </div>
+
+      <h2>Clear Vocabulary</h2>
+      <button onClick={clearAllWords} style={{ marginLeft: "1rem", color: "red" }}>
+        Borrar todo
+      </button>
+
     </div>
   );
 }
