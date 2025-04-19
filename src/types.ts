@@ -10,6 +10,7 @@ export interface Word {
   type: WordType;
   semanticField: string;
   favorite: boolean;
+  example: string,
   lexicon: {
     level: LexiconLevel;
     subtype?: SurfaceSubtype; // solo si level === "surface"
